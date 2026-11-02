@@ -426,9 +426,10 @@ export default class Agents extends View {
               this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
               cx.notify();
             })).child(pic)))
-          .when(Boolean(this.labels[a.address]), (el) => el.child(div().size(7).flex_none().rounded(4)
-            .bg(labelHex(this.labels[a.address]) ?? t.dim)
-            .tooltip(labelNames[this.labels[a.address]] || this.labels[a.address])))
+          .when(Boolean(this.labels[a.address]), (el) => el.child(h_flex().h(16).px(6).max_w(96).flex_none().items_center()
+            .rounded(8).bg(labelHex(this.labels[a.address]) ?? t.dim).text_size(10).text_color(t.solid_foreground)
+            .tooltip(labelNames[this.labels[a.address]] || this.labels[a.address])
+            .child(div().min_w(0).truncate().child(labelNames[this.labels[a.address]] || this.labels[a.address]))))
           .child(div().flex_1().min_w(0).truncate().text_size(11.5)
             .text_color(idle || this.archived.has(a.address) ? t.muted : t.foreground).child(name))
           .child(div().w(17).h(17).flex_none().items_center().justify_center()
