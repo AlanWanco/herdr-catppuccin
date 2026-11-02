@@ -350,7 +350,7 @@ export default class Agents extends View {
       const rowW = Math.max(160, (this.listW ?? sideW) - 16);  // the list pads 8 a side
       // The tail is natural-width now, so the title keeps the room instead of
       // yielding a fixed column to a pill that is often shorter than that.
-      const taskW = Math.max(80, rowW - 20 - (8 + depth * 12) - indent - 150);
+      const taskW = Math.max(80, rowW - 20 - (8 + depth * 12) - indent - 120);
       const pill = h_flex().flex_none().h(16).px(6).gap(3).items_center()
         .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
         .child(div().text_color(t.accent).child("\u2756"))
@@ -383,7 +383,7 @@ export default class Agents extends View {
           .when(this.hovered === a.address, el => el.child(pin)))
         .child(h_flex().items_center().gap(0).pl(indent)
           .child(div().flex_none().w(taskW).truncate().text_size(10).text_color(t.dim)
-            .child(task ? shortTitle(task, Math.max(8, Math.floor(taskW / 5.8))) : ""))
+            .child(task ? shortTitle(task, Math.max(8, Math.floor(taskW / 7))) : ""))
           .child(h_flex().flex_1().min_w(0).items_center().gap(6).justify_end()
             .when(hasPill, el => el.child(pill))
             .when(Boolean(when), el => el.child(div().flex_none().text_size(10).text_color(t.dim).child(duration(now - when))))
