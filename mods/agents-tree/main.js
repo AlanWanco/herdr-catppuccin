@@ -101,9 +101,8 @@ export default class Agents extends View {
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
-    this.labels = JSON.parse(localStorage.getItem("agents-tree.labels") ?? "{}");
-    this.archived = new Set(JSON.parse(localStorage.getItem("agents-tree.archived") ?? "[]"));
-    this.menuFor = null; // the row whose menu is open, inline under it
+    this.labels = shared("agents-tree.labels") ?? {};
+    this.archived = new Set(shared("agents-tree.archived") ?? []);
 
     cx.timer.every(30000, (cx) => cx.notify());
   }
@@ -158,14 +157,21 @@ export default class Agents extends View {
     return sawDone ? RANK.done : RANK[a.status] ?? 0;
   }
 
+  // The row's menu is a popup of its own, as herdr's menus are: opened at the
+  // pointer, closed by its items or Esc.
+  openMenu(a) {
+    openOverlay({ mod: "agent-menu", kind: "popup", width: 200, height: 236, props: { agent: a.address, tab: a.tab } });
+  }
+
   saveArchived() {
-    localStorage.setItem("agents-tree.archived", JSON.stringify([...this.archived]));
+    setShared("agents-tree.archived", [...this.archived]);
   }
 
   setLabel(address, name) {
-    if (name) this.labels[address] = name;
-    else delete this.labels[address];
-    localStorage.setItem("agents-tree.labels", JSON.stringify(this.labels));
+    const next = { ...(shared("agents-tree.labels") ?? {}) };
+    if (name) next[address] = name;
+    else delete next[address];
+    setShared("agents-tree.labels", next);
   }
 
   sortMenu(t) {
@@ -251,8 +257,8 @@ export default class Agents extends View {
     const t = theme();
     // Labels and the archive can be changed from a row menu (or another window),
     // so the newest copy wins on every render.
-    this.labels = JSON.parse(localStorage.getItem("agents-tree.labels") ?? "{}");
-    this.archived = new Set(JSON.parse(localStorage.getItem("agents-tree.archived") ?? "[]"));
+    this.labels = shared("agents-tree.labels") ?? {};
+    this.archived = new Set(shared("agents-tree.archived") ?? []);
     if (props()?.sortMenu) return this.sortMenu(t);
     const collapsed = narrow();
     const sort = sortOf();
@@ -282,37 +288,11 @@ export default class Agents extends View {
     list = [...pinned, ...rest];
     setAgentOrder(list.map((a) => a.address));
 
-    // The row menu: rename, archive, and a Catppuccin label. Inline under the
-    // row — a popup opened from a press never survived to be seen.
-    const menuOf = (a) => {
-      const mine = this.labels[a.address] ?? null;
-      const archived = this.archived.has(a.address);
-      const act = (fn) => (_e, cx) => { fn(); this.menuFor = null; cx.notify(); };
-      const item = (id, text) => h_flex().id(id).h(26).px(7).items_center().rounded(6).text_size(12)
-        .text_color(t.foreground).hover((el) => el.bg(t.hover)).child(text);
-      const dot = ([name, hex]) => div().id("lm-" + name).size(14).flex_none().rounded(7).bg(hex).cursor_pointer()
-        .when(mine === name, (el) => el.border(2).border_color(t.foreground))
-        .hover((el) => el.border(2).border_color(t.muted))
-        .on_click(act(() => this.setLabel(a.address, name)));
-      return v_flex().id("menu-" + a.address).pl(8).pb(6)
-        .child(v_flex().w(196).p(4).rounded(8).bg(t.popover).border_1().border_color(t.border).gap(1)
-          .child(item("am-rename", "重命名…").on_click(act(() => run("tab.rename", { id: a.tab }))))
-          .child(item("am-archive", archived ? "取消归档" : "归档").on_click(act(() => {
-            archived ? this.archived.delete(a.address) : this.archived.add(a.address);
-            this.saveArchived();
-          })))
-          .child(div().px(7).pt(5).pb(1).text_size(10).text_color(t.dim).child("标签"))
-          .children([LABELS.slice(0, 7), LABELS.slice(7)].map((line) => h_flex().gap(5).px(7).py(1)
-            .children(line.map(dot))))
-          .when(Boolean(mine), (el) => el.child(item("am-clear", "清除标签").on_click(act(() => this.setLabel(a.address, null))))));
-    };
-
     const withKids = (a, i, depth = 0) => {
       const subs = collapsed ? [] : this.tree(all, a.address);
       const r = row(a, i, subs, depth);
-      const m = this.menuFor === a.address ? [menuOf(a)] : [];
-      if (this.folded.has(a.address)) return [r, ...m];
-      return [r, ...m, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
+      if (this.folded.has(a.address)) return [r];
+      return [r, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
     };
 
     // The fold chevron; folded, the count too, colored by the most urgent one.
@@ -436,15 +416,7 @@ export default class Agents extends View {
         .on_click(() => run("pane.focus", { pane: a.pane }))
         .on_mouse_down("right", (_e, cx) => {
           cx.stop_propagation();
-          this.menuFor = this.menuFor === a.address ? null : a.address;
-          cx.notify();
-        })
-        .on_mouse_down("left", (e, cx) => {
-          // Double-click is the reliable way in here: the app claims right-click.
-          if (e.click_count !== 2) return;
-          cx.stop_propagation();
-          this.menuFor = this.menuFor === a.address ? null : a.address;
-          cx.notify();
+          this.openMenu(a);
         })
         .child(h_flex().items_center().gap(9)
           .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
@@ -455,9 +427,10 @@ export default class Agents extends View {
             })).child(pic)))
           .when(Boolean(this.labels[a.address]), (el) => el.child(div().size(7).flex_none().rounded(4)
             .bg(labelHex(this.labels[a.address]) ?? t.dim)))
-          .child(div().flex_none().max_w(200).truncate().text_size(11.5)
+          .child(div().flex_1().min_w(0).truncate().text_size(11.5)
             .text_color(idle || this.archived.has(a.address) ? t.muted : t.foreground).child(name))
-          .when(this.hovered === a.address, el => el.child(pin)))
+          .child(div().w(17).h(17).flex_none().items_center().justify_center()
+            .when(this.hovered === a.address, el => el.child(pin))))
         .child(h_flex().items_center().gap(0).pl(indent)
           .child(div().flex_none().w(taskW).truncate().text_size(10).text_color(t.dim)
             .child(task ? shortTitle(task, Math.max(8, Math.floor(taskW / 7))) : ""))
@@ -528,8 +501,8 @@ export default class Agents extends View {
       .child(div().flex_1())
       .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none().text_color(t.dim));
 
+    // The archive folder is always there, empty or not; it is where a row goes to rest.
     const archiveSection = () => {
-      if (!archivedRows.length) return [];
       const g = { id: "archive", label: "Archive", status: null, members: archivedRows };
       return [header(g), ...(this.folded.has("archive") ? [] : archivedRows.flatMap((a, i) => withKids(a, i, 0)))];
     };

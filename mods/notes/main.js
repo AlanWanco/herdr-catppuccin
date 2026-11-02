@@ -122,7 +122,7 @@ export default class Notes extends View {
       this.state = EditorState.new({ value: this.text, soft_wrap: true, line_numbers: false, folding: false,
         font_family: settings().font_family, font_size: 13 });
       this.state.on("change", (_e, cx) => { this.text = this.state.value(); this.save(cx); cx.notify(); });
-      this.state.on("paste_other", (_e, cx) => this.pasteImage(cx));
+      this.state.on("paste_other", (_e, cx) => cx.spawn((cx) => this.pasteImage(cx)));
       this.measure(this.text, cx);
     } catch { this.text = ""; this.state = null; this.failed = "Could not open " + name; }
     cx.notify();
@@ -202,9 +202,9 @@ export default class Notes extends View {
     const value = this.note.replace(/\.md$/, "");
     this.nameInput = InputState.new({ value });
     this.nameInput.set_selected_range({ start: 0, end: value.length });
-    this.nameInput.on("submit", (_e, cx) => this.rename(this.note, this.nameInput.value(), cx));
+    this.nameInput.on("submit", (_e, cx) => cx.spawn((cx) => this.rename(this.note, this.nameInput.value(), cx)));
     // Clicking away saves the name too, the way the rest of the panel works.
-    this.nameInput.on("blur", (_e, cx) => { if (this.renaming) this.rename(this.note, this.nameInput.value(), cx); });
+    this.nameInput.on("blur", (_e, cx) => { if (this.renaming) cx.spawn((cx) => this.rename(this.note, this.nameInput.value(), cx)); });
     this.renaming = true;
     this.nameInput.focus();
     cx.notify();
@@ -214,7 +214,7 @@ export default class Notes extends View {
     const next = (this.text ?? "").replace(/\s+$/, "") + add;
     this.text = next;
     if (this.state) this.state.set_value(next);
-    if (cx) this.measure(next, cx);
+    if (cx) cx.spawn((cx) => this.measure(next, cx));
   }
 
   // A picture dropped from the desktop lands in notes/images and is appended the same way.
@@ -245,7 +245,7 @@ export default class Notes extends View {
       this.note = null;
       this.agent = key;
       this.notes = [];
-      this.list(cx);
+      cx.spawn((cx) => this.list(cx));
     }
     const who = agents().find((a) => a.address === focused()?.agent) ?? null;
     const button = (id, label, action) => h_flex().id(id).h(24).px(8).flex_none().items_center().rounded(6)
@@ -255,7 +255,7 @@ export default class Notes extends View {
     const head = h_flex().h(34).flex_none().px(10).gap(6).items_center().border_b(1).border_color(t.border).bg(t.chrome)
       .when(Boolean(this.note), (el) => el.child(h_flex().id("notes-back").h(24).px(6).flex_none().items_center().rounded(6)
         .text_size(11.5).text_color(t.dim).hover((x) => x.bg(t.hover).text_color(t.foreground))
-        .on_click((_e, cx) => { this.release(); this.note = null; this.list(cx); }).child("←")))
+        .on_click((_e, cx) => { this.release(); this.note = null; cx.notify(); cx.spawn((cx) => this.list(cx)); }).child("←")))
       .child(this.note && this.renaming
         ? div().flex_1().min_w(0).child(Input.new(this.nameInput).h(24).px(8).rounded(6).border_1()
           .border_color(t.accent).bg(t.background).text_size(12).text_color(t.foreground))
@@ -276,9 +276,9 @@ export default class Notes extends View {
         .bg(this.pins[this.pinKey(this.noteAgent, this.note)] ? t.selected : t.chrome)
         .border_1().border_color(t.border).hover((x) => x.bg(t.hover).text_color(t.foreground))
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .on_click((_e, cx) => this.togglePin(this.noteAgent, this.note, cx))
+        .on_click((_e, cx) => cx.spawn((cx) => this.togglePin(this.noteAgent, this.note, cx)))
         .child(svg("mods/workspace-chrome/" + (this.pins[this.pinKey(this.noteAgent, this.note)] ? "pin.svg" : "pin-off.svg")).size(13))))
-      .child(button("notes-new", "＋", (_e, cx) => this.create(cx)))
+      .child(button("notes-new", "＋", (_e, cx) => cx.spawn((cx) => this.create(cx))))
       .when(inPane && !this.note, (el) => el.child(button("notes-open", "Open", (_e, cx) => openOverlay({ mod: "notes", kind: "dialog", width: 620, height: 660 }))));
 
     if (!this.note) {
@@ -288,11 +288,11 @@ export default class Notes extends View {
         .text_color(pinnedNow(agent, name) ? t.accent : t.dim)
         .hover((x) => x.bg(t.hover).text_color(t.foreground))
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .on_click((_e, cx) => this.togglePin(agent, name, cx))
+        .on_click((_e, cx) => cx.spawn((cx) => this.togglePin(agent, name, cx)))
         .child(svg("mods/workspace-chrome/" + (pinnedNow(agent, name) ? "pin.svg" : "pin-off.svg")).size(13));
       const row = (n, label, scope) => h_flex().id("note-" + scope + "-" + n.agent + "-" + n.name).h(28).flex_none().px(10).gap(8).items_center().cursor_pointer()
         .text_size(12).text_color(t.foreground).hover((x) => x.bg(t.hover))
-        .on_click((_e, cx) => this.open(n.name, cx, n.agent))
+        .on_click((_e, cx) => cx.spawn((cx) => this.open(n.name, cx, n.agent)))
         .child(div().flex_1().min_w(0).truncate().child(label))
         .child(pinTag(n.agent, n.name, scope));
       const title = (text, count) => h_flex().flex_none().px(10).pt(8).pb(2).gap(6).items_center()

@@ -1,3 +1,8 @@
 *.key
 magpie-web.key
 node_modules/
+magpie-gateway.txt
+shared.json
+data/
+*.png
+*.har

@@ -10,6 +10,7 @@ layouts/terminals.json   herdr 主题、字号、颜色（Mocha）
 mods/spaces-tree/        自定义 mod（Spaces / Routing / Usage）
 mods/notes/               herdr 自带 notes mod 的本地修补
 mods/agents-tree/         herdr 自带 agents-tree mod 的本地修补
+mods/agent-menu/          agents-tree 的右键弹出菜单
 omp/catppuccin-mocha.json omp TUI 主题（Catppuccin Mocha）
 ```
 
@@ -31,8 +32,8 @@ row
    └─ status       workspace-status   28px
 ```
 
-除 `spaces-tree` 外，其余 mod 都是 herdr-app 自带的（`workspace-chrome`、`agents-tree`、
-`tabs-panel`、`files`、`changes`、`prompts`、`notes`、`quests`、`workspace-status`）。
+`spaces-tree` 和 `agent-menu` 是自定义 mod；`notes`、`agents-tree` 包含本仓库的修补。
+其余依赖由 herdr-app 自带，包括 `workspace-chrome`、`tabs-panel`、`files`、`changes`、`prompts`、`quests`、`workspace-status`。
 
 ## spaces-tree 做了什么
 
@@ -47,15 +48,16 @@ row
 ## 对自带 mod 的两处修补
 
 `mods/notes`：
-- 同时出现在 “Pinned” 和 “This agent” 的同一篇笔记，两行元素 id 相同，其中一行的点击被另一行吃掉
-  （表现为“pinned 的笔记偶尔打不开”）。行 id / pin id 加上 `pinned-` / `mine-` 作用域。
+- “Pinned” 和 “This agent” 的行 id / pin id 分别带 `pinned-` / `mine-` 作用域，避免同一篇笔记的元素 id 重复。
+- 打开笔记、切换笔记列表等异步入口使用 `cx.spawn`，读取完成后通过有效的异步上下文刷新界面，
+  避免内容要等终端产生新消息才显示。点击事件的 `cx` 不能跨 `await` 使用。
 - 打开失败时底部显示 `Could not open <name>`，不再一直停在省略号。
 
 `mods/agents-tree`：
-- **双击行**打开行内菜单：重命名（改 tab 名）、归档、Catppuccin 颜色标签（14 色）。
-  右键在这个面板被应用自带的 Status/Space 菜单占用，所以用双击。
-- 归档的行收进列表底部的 **Archive** 分组；正在跑（working/blocked）的会被自动取回，
-  之后再手动归档一次。
+- **右键点击行**打开独立弹出菜单：重命名（改 tab 名）、归档、Catppuccin 颜色标签（14 色）。
+  菜单覆盖在界面上，不挤动列表；行尾不再显示菜单 chevron。选项执行后关闭菜单，也可按 Esc 关闭。
+- 归档的行收进列表底部的 **Archive** 分组，空分组也显示；正在跑（working/blocked）的会被自动取回，
+  完成后保持在主列表，需要再次手动归档。
 - 行尾的机器名（`mac-mini`）与分组标题重复，换成终端标题里的 **omp session title**：
   两行制，第一行只有 agent 名字（不缩），第二行缩进显示标题（`..` 截断），
   右侧依次是 space 胶囊、时长、状态圆点；右侧留出滚动条位置，圆点不会被压住。
@@ -65,11 +67,11 @@ row
 ```sh
 git clone https://github.com/AlanWanco/herdr-omp-catppuccin
 cd herdr-omp-catppuccin
-cp layouts/main-log.json ~/.config/herdr-app/layouts/
-cp -r mods/spaces-tree   ~/.config/herdr-app/mods/
+cp layouts/main-log.json layouts/terminals.json ~/.config/herdr-app/layouts/
+cp -r mods/spaces-tree mods/notes mods/agents-tree mods/agent-menu ~/.config/herdr-app/mods/
 ```
 
-重启 herdr-app，然后切换到 `main-log` 布局（或在现有布局里把相应 block 换成 `spaces-tree`）。
+文件会热加载；切换到 `main-log` 布局（或在现有布局里使用对应 mod）。
 
 ## omp 主题
 
@@ -110,13 +112,6 @@ API key 从 `omp auth export` 里取（`provider === "magpie"`），不落盘到
 - 登录 key、账号（手机号/邮箱/用户名）、主目录路径都不在仓库里；
 - 布局 JSON 只含 block id、mod 名和尺寸，不含目录、终端内容或机器名；
 - commit 作者是统一的中性身份，不是个人邮箱。
-
-## 已知的坑
-
-- 这个面板里 `justify_between`、`flex_1`、`ml_auto` 会把后面的兄弟元素吞掉；
-  文本元素上的百分比宽度会被内容顶开。所以列宽都是按 `layout()` 的侧栏宽度算成像素，
-  行内徽章用固定宽度，保证对齐。
-- 带小数的百分比（`"17.2%"`）不生效，只有整数。
 
 ## 许可
 
