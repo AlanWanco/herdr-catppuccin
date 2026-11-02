@@ -51,6 +51,15 @@ function title(tab, l) {
   const telling = live && live !== prog && !/^[~/]|^[A-Za-z]:\\/.test(live) && !live.includes("@") && live.toLowerCase() !== l?.program?.key;
   return tab.name === prog && telling ? live : tab.name;
 }
+// Catppuccin Mocha, the labels a row can carry.
+const LABELS = [
+  ["rosewater", "#f5e0dc"], ["flamingo", "#f2cdcd"], ["pink", "#f5c2e7"], ["mauve", "#cba6f7"],
+  ["red", "#f38ba8"], ["maroon", "#eba0ac"], ["peach", "#fab387"], ["yellow", "#f9e2af"],
+  ["green", "#a6e3a1"], ["teal", "#94e2d5"], ["sky", "#89dceb"], ["sapphire", "#74c7ec"],
+  ["blue", "#89b4fa"], ["lavender", "#b4befe"],
+];
+const labelHex = (name) => LABELS.find(([n]) => n === name)?.[1] ?? null;
+
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
 // A sub-agent without a pane isn't in agents(): its raw word, error counting as
 // blocked. It's never done: it reports to its parent, and the parent's done is the news.
@@ -92,6 +101,10 @@ export default class Agents extends View {
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
+    this.labels = JSON.parse(localStorage.getItem("agents-tree.labels") ?? "{}");
+    this.archived = new Set(JSON.parse(localStorage.getItem("agents-tree.archived") ?? "[]"));
+    this.menuFor = null; // the row whose menu is open, inline under it
+
     cx.timer.every(30000, (cx) => cx.notify());
   }
 
@@ -143,6 +156,16 @@ export default class Agents extends View {
   rank(a) {
     const sawDone = a.address === this.held?.address && this.held.rank === RANK.done && a.status === "idle";
     return sawDone ? RANK.done : RANK[a.status] ?? 0;
+  }
+
+  saveArchived() {
+    localStorage.setItem("agents-tree.archived", JSON.stringify([...this.archived]));
+  }
+
+  setLabel(address, name) {
+    if (name) this.labels[address] = name;
+    else delete this.labels[address];
+    localStorage.setItem("agents-tree.labels", JSON.stringify(this.labels));
   }
 
   sortMenu(t) {
@@ -226,6 +249,10 @@ export default class Agents extends View {
 
   render(cx) {
     const t = theme();
+    // Labels and the archive can be changed from a row menu (or another window),
+    // so the newest copy wins on every render.
+    this.labels = JSON.parse(localStorage.getItem("agents-tree.labels") ?? "{}");
+    this.archived = new Set(JSON.parse(localStorage.getItem("agents-tree.archived") ?? "[]"));
     if (props()?.sortMenu) return this.sortMenu(t);
     const collapsed = narrow();
     const sort = sortOf();
@@ -242,15 +269,50 @@ export default class Agents extends View {
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
     this.prunePins(all);
     const pinned = this.pins.map((p) => list.find((a) => a.address === p)).filter(Boolean);
-    const rest = list.filter((a) => !this.pins.includes(a.address));
+    // Archived agents rest at the bottom. One that starts working (or asks for
+    // you) comes back on its own; archiving it again stays a choice.
+    let archiveDirty = false;
+    for (const addr of [...this.archived]) {
+      const a = list.find((x) => x.address === addr);
+      if (!a || a.status === "working" || a.status === "blocked") { this.archived.delete(addr); archiveDirty = true; }
+    }
+    if (archiveDirty) this.saveArchived();
+    const archivedRows = list.filter((a) => this.archived.has(a.address));
+    const rest = list.filter((a) => !this.pins.includes(a.address) && !this.archived.has(a.address));
     list = [...pinned, ...rest];
     setAgentOrder(list.map((a) => a.address));
+
+    // The row menu: rename, archive, and a Catppuccin label. Inline under the
+    // row — a popup opened from a press never survived to be seen.
+    const menuOf = (a) => {
+      const mine = this.labels[a.address] ?? null;
+      const archived = this.archived.has(a.address);
+      const act = (fn) => (_e, cx) => { fn(); this.menuFor = null; cx.notify(); };
+      const item = (id, text) => h_flex().id(id).h(28).px(8).items_center().rounded(6).text_size(12)
+        .text_color(t.foreground).hover((el) => el.bg(t.hover)).child(text);
+      const dot = ([name, hex]) => div().id("lm-" + name).size(16).flex_none().rounded(8).bg(hex).cursor_pointer()
+        .when(mine === name, (el) => el.border(2).border_color(t.foreground))
+        .hover((el) => el.border(2).border_color(t.muted))
+        .on_click(act(() => this.setLabel(a.address, name)));
+      return v_flex().id("menu-" + a.address).pl(8).pr(8).pb(6).pt(2)
+        .child(v_flex().p(4).rounded(8).bg(t.popover).border_1().border_color(t.border).gap(1)
+          .child(item("am-rename", "重命名…").on_click(act(() => run("tab.rename", { id: a.tab }))))
+          .child(item("am-archive", archived ? "取消归档" : "归档").on_click(act(() => {
+            archived ? this.archived.delete(a.address) : this.archived.add(a.address);
+            this.saveArchived();
+          })))
+          .child(div().px(8).pt(4).text_size(10.5).text_color(t.dim).child("标签"))
+          .children([LABELS.slice(0, 7), LABELS.slice(7)].map((line) => h_flex().gap(6).px(8).py(2)
+            .children(line.map(dot))))
+          .when(Boolean(mine), (el) => el.child(item("am-clear", "清除标签").on_click(act(() => this.setLabel(a.address, null))))));
+    };
 
     const withKids = (a, i, depth = 0) => {
       const subs = collapsed ? [] : this.tree(all, a.address);
       const r = row(a, i, subs, depth);
-      if (this.folded.has(a.address)) return [r];
-      return [r, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
+      const m = this.menuFor === a.address ? [menuOf(a)] : [];
+      if (this.folded.has(a.address)) return [r, ...m];
+      return [r, ...m, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
     };
 
     // The fold chevron; folded, the count too, colored by the most urgent one.
@@ -372,6 +434,18 @@ export default class Agents extends View {
           cx.notify();
         })
         .on_click(() => run("pane.focus", { pane: a.pane }))
+        .on_mouse_down("right", (_e, cx) => {
+          cx.stop_propagation();
+          this.menuFor = this.menuFor === a.address ? null : a.address;
+          cx.notify();
+        })
+        .on_mouse_down("left", (e, cx) => {
+          // Double-click is the reliable way in here: the app claims right-click.
+          if (e.click_count !== 2) return;
+          cx.stop_propagation();
+          this.menuFor = this.menuFor === a.address ? null : a.address;
+          cx.notify();
+        })
         .child(h_flex().items_center().gap(9)
           .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
             .when(subs.length > 0, el => el.on_click((_e, cx) => {
@@ -379,7 +453,10 @@ export default class Agents extends View {
               this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
               cx.notify();
             })).child(pic)))
-          .child(div().flex_none().max_w(200).truncate().text_size(11.5).text_color(idle ? t.muted : t.foreground).child(name))
+          .when(Boolean(this.labels[a.address]), (el) => el.child(div().size(7).flex_none().rounded(4)
+            .bg(labelHex(this.labels[a.address]) ?? t.dim)))
+          .child(div().flex_none().max_w(200).truncate().text_size(11.5)
+            .text_color(idle || this.archived.has(a.address) ? t.muted : t.foreground).child(name))
           .when(this.hovered === a.address, el => el.child(pin)))
         .child(h_flex().items_center().gap(0).pl(indent)
           .child(div().flex_none().w(taskW).truncate().text_size(10).text_color(t.dim)
@@ -422,6 +499,8 @@ export default class Agents extends View {
           cx.notify();
         })
         .child(div().truncate().text_color(t[g.status] ?? t.dim).child(g.label))
+
+
         .when(byPriority || !open, (el) => el.child(div().text_color(t.dim).child(String(g.members.length))))
         .child(div().flex_1())
         .when(!open, (el) => el
@@ -449,9 +528,15 @@ export default class Agents extends View {
       .child(div().flex_1())
       .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none().text_color(t.dim));
 
+    const archiveSection = () => {
+      if (!archivedRows.length) return [];
+      const g = { id: "archive", label: "Archive", status: null, members: archivedRows };
+      return [header(g), ...(this.folded.has("archive") ? [] : archivedRows.flatMap((a, i) => withKids(a, i, 0)))];
+    };
+
     let rows;
     if (collapsed) rows = list.flatMap((a, i) => withKids(a, i, 0));
-    else if (byPriority) rows = groups.flatMap((g) => [header(g), ...(this.folded.has(g.id) ? [] : g.members.flatMap((a, i) => withKids(a, i, 0)))]);
+    else if (byPriority) rows = [...groups.flatMap((g) => [header(g), ...(this.folded.has(g.id) ? [] : g.members.flatMap((a, i) => withKids(a, i, 0)))]), ...archiveSection()];
     else {
       rows = [];
       if (pinned.length) {
@@ -486,6 +571,7 @@ export default class Agents extends View {
           if (sOpen) rows.push(...g.members.flatMap((a, i) => withKids(a, i, 2)));
         });
       }
+      rows.push(...archiveSection());
     }
 
     return v_flex()

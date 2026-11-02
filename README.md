@@ -52,6 +52,10 @@ row
 - 打开失败时底部显示 `Could not open <name>`，不再一直停在省略号。
 
 `mods/agents-tree`：
+- **双击行**打开行内菜单：重命名（改 tab 名）、归档、Catppuccin 颜色标签（14 色）。
+  右键在这个面板被应用自带的 Status/Space 菜单占用，所以用双击。
+- 归档的行收进列表底部的 **Archive** 分组；正在跑（working/blocked）的会被自动取回，
+  之后再手动归档一次。
 - 行尾的机器名（`mac-mini`）与分组标题重复，换成终端标题里的 **omp session title**：
   两行制，第一行只有 agent 名字（不缩），第二行缩进显示标题（`..` 截断），
   右侧依次是 space 胶囊、时长、状态圆点；右侧留出滚动条位置，圆点不会被压住。
