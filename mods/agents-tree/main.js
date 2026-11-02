@@ -347,10 +347,10 @@ export default class Agents extends View {
       // Two lines: the name alone on top, then the task indented under it with the
       // space, the age and the dot right-aligned after it.
       const indent = 9 + 15;
-      const tailW = (hasPill ? 76 : 0) + 6 * 3 + 30 + 20;   // pill, gaps, age, dot
+      const tailW = (hasPill ? 76 : 0) + 22 + 10;   // pill, age, dot — packed together
       const rowW = Math.max(160, (this.listW ?? sideW) - 16);  // the list pads 8 a side
       const taskW = Math.max(40, rowW - 20 - (8 + depth * 12) - indent - tailW);
-      const pill = h_flex().flex_none().w(76).h(16).px(6).gap(4).items_center()
+      const pill = h_flex().flex_none().w(76).h(16).pr(6).pl(4).gap(3).items_center().justify_end()
         .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
         .child(div().text_color(t.accent).child("\u2756"))
         .child(div().min_w(0).truncate().child(a.space_name ?? ""));
@@ -380,13 +380,13 @@ export default class Agents extends View {
             })).child(pic)))
           .child(div().flex_none().max_w(200).truncate().text_size(11.5).text_color(idle ? t.muted : t.foreground).child(name))
           .when(this.hovered === a.address, el => el.child(pin)))
-        .child(h_flex().items_center().gap(6).pl(indent)
+        .child(h_flex().items_center().gap(0).pl(indent)
           .child(div().flex_none().w(taskW).truncate().text_size(10).text_color(t.dim)
             .child(task ? shortTitle(task, Math.max(8, Math.floor(taskW / 5.8))) : ""))
           .when(hasPill, el => el.child(pill))
-          .when(Boolean(when), el => el.child(h_flex().flex_none().w(30).items_center()
+          .when(Boolean(when), el => el.child(h_flex().flex_none().w(22).pl(2).items_center()
             .child(div().text_size(10).text_color(t.dim).child(duration(now - when)))))
-          .child(h_flex().flex_none().w(20).items_center().justify_center()
+          .child(h_flex().flex_none().w(10).items_center().justify_center()
             .child(this.status(t, a, byPriority && !isPinned))));
     };
 
