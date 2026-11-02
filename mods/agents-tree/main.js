@@ -305,7 +305,8 @@ export default class Agents extends View {
       // The row gives the agent's name its room first; the task gets what is left,
       // never less than a few characters, and gives way on a narrow sidebar.
       const sideW = find(layout(), "sidebar")?.size?.px ?? 268;
-      const titleW = Math.max(0, sideW - 300);
+      const hasPill = (byPriority || this.pins.includes(a.address)) && Boolean(a.space_name);
+      const titleW = Math.max(0, sideW - (hasPill ? 360 : 300));
       if (collapsed) {
         return h_flex()
           .id(`ag-${a.address}`)
@@ -370,7 +371,7 @@ export default class Agents extends View {
           })).child(pic)))
         .child(h_flex().flex_none().gap(5).items_center()
           .child(div().flex_none().max_w(150).truncate().text_color(idle ? t.muted : t.foreground).child(name))
-          .when(!task && (byPriority || isPinned) && Boolean(a.space_name), (el) => el.child(h_flex().flex_none().h(16).px(6).gap(4).items_center()
+          .when(hasPill, (el) => el.child(h_flex().flex_none().h(16).px(6).gap(4).items_center()
             .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
             .child(div().text_color(t.accent).child("\u2756"))
             .child(div().max_w(70).truncate().child(a.space_name))))
