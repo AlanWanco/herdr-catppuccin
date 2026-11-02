@@ -52,8 +52,9 @@ row
 - 打开失败时底部显示 `Could not open <name>`，不再一直停在省略号。
 
 `mods/agents-tree`：
-- 行尾的机器名（`mac-mini`）与分组标题重复，换成终端标题里的 **omp session title**，
-  去掉 `π`、spinner、图标等前缀；宽度不够时先让标题收缩（`..` 截断），agent 名字不缩。
+- 行尾的机器名（`mac-mini`）与分组标题重复，换成终端标题里的 **omp session title**：
+  两行制，第一行只有 agent 名字（不缩），第二行缩进显示标题（`..` 截断），
+  右侧依次是 space 胶囊、时长、状态圆点；右侧留出滚动条位置，圆点不会被压住。
 
 ## 安装
 

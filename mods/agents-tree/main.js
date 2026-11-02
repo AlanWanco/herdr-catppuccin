@@ -35,8 +35,8 @@ const cleanTitle = (raw) => {
     .replace(/[\u2800-\u28FF]/g, "")            // braille spinner frames
     .replace(/[\uE000-\uF8FF]/g, "")            // private use icons (nerd font)
     .replace(/[\u{F0000}-\u{FFFFD}]/gu, "");
-  s = s.replace(/^\s*\u03C0\s*/u, "");
-  return s.replace(/\s+/g, " ").trim();
+  s = s.replace(/^\s*\u03C0\s*/u, "").replace(/\s+/g, " ").trim();
+  return s.replace(/^[^\p{L}\p{N}]+/u, "");   // a leading "> " or bullet says nothing
 };
 const shortTitle = (s, n) => (s.length > n ? s.slice(0, n).replace(/\s+$/, "") + ".." : s);
 
@@ -344,16 +344,23 @@ export default class Agents extends View {
       // Without a space header above (priority, pinned) the row names its space.
       const full = isPinned; // the space rides in its own pill when there is no space header
       const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
-      return h_flex()
+      // Two lines: the name alone on top, then the task indented under it with the
+      // space, the age and the dot right-aligned after it.
+      const indent = 9 + 15;
+      const tailW = (hasPill ? 76 : 0) + 30 + 20 + 18;
+      const taskW = Math.max(40, sideW - 44 - depth * 12 - indent - tailW);
+      const pill = h_flex().flex_none().w(76).h(16).px(6).gap(4).items_center()
+        .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
+        .child(div().text_color(t.accent).child("\u2756"))
+        .child(div().min_w(0).truncate().child(a.space_name ?? ""));
+      return v_flex()
         .id(`ag-${a.address}`)
-        .pr(8)
+        .pr(20)          // room for the list's scrollbar, or the dot sits under it
         .pl(8 + depth * 12)
-        .text_size(11.5)
-        .h(28)
+        .py(3)
         .flex_none()
         .rounded(8)
-        .items_center()
-        .gap(9)
+        .gap(1)
         .when(a.focused, (el) => el.bg(t.selected))
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
@@ -363,24 +370,21 @@ export default class Agents extends View {
           cx.notify();
         })
         .on_click(() => run("pane.focus", { pane: a.pane }))
-        .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
-          .when(subs.length > 0, el => el.on_click((_e, cx) => {
-            cx.stop_propagation();
-            this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
-            cx.notify();
-          })).child(pic)))
-        .child(h_flex().flex_none().gap(5).items_center()
-          .child(div().flex_none().max_w(150).truncate().text_color(idle ? t.muted : t.foreground).child(name))
-          .when(hasPill, (el) => el.child(h_flex().flex_none().h(16).px(6).gap(4).items_center()
-            .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
-            .child(div().text_color(t.accent).child("\u2756"))
-            .child(div().max_w(70).truncate().child(a.space_name))))
-          .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`))))
-        .when(Boolean(task) && titleW >= 54, el => el.child(div().flex_none().w(titleW).truncate().text_size(10).text_color(t.dim).child(shortTitle(task, Math.max(8, Math.floor(titleW / 5.4))))))
-        .when(subs.length > 0, el => el.child(fold(a, subs)))
-        .when(this.hovered === a.address, el => el.child(pin))
-        .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
-        .child(this.status(t, a, byPriority && !isPinned));
+        .child(h_flex().items_center().gap(9)
+          .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
+            .when(subs.length > 0, el => el.on_click((_e, cx) => {
+              cx.stop_propagation();
+              this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
+              cx.notify();
+            })).child(pic)))
+          .child(div().flex_none().max_w(200).truncate().text_size(11.5).text_color(idle ? t.muted : t.foreground).child(name))
+          .when(this.hovered === a.address, el => el.child(pin)))
+        .child(h_flex().items_center().gap(6).pl(indent)
+          .child(div().flex_none().w(taskW).truncate().text_size(10).text_color(t.dim)
+            .child(task ? shortTitle(task, Math.max(8, Math.floor(taskW / 5.8))) : ""))
+          .when(hasPill, el => el.child(pill))
+          .when(Boolean(when), el => el.child(div().flex_none().w(30).text_size(10).text_color(t.dim).child(duration(now - when))))
+          .child(div().flex_none().child(this.status(t, a, byPriority && !isPinned))));
     };
 
     // Groups in list order: spaces (grouped) or priority sections. Agents of a
