@@ -8,7 +8,9 @@ Herdr-app layout in a Catppuccin mood, plus a customized `spaces-tree` mod
 layouts/main-log.json    左侧栏 + 工作区结构
 layouts/terminals.json   herdr 主题、字号、颜色（Mocha）
 mods/spaces-tree/        自定义 mod（Spaces / Routing / Usage）
-omp/catppuccin-mocha.json  omp TUI 主题（Catppuccin Mocha）
+mods/notes/               herdr 自带 notes mod 的本地修补
+mods/agents-tree/         herdr 自带 agents-tree mod 的本地修补
+omp/catppuccin-mocha.json omp TUI 主题（Catppuccin Mocha）
 ```
 
 ## 布局结构
@@ -41,6 +43,17 @@ row
   `N rest` 是该模型下额度用满（`used >= 100%`）的账号数。
 - **Usage**：magpie 的配额与当日用量。多账号的 plan 默认收起（只有标题行），点开列出每个账号；
   单账号直接展示。进度条显示**剩余**额度，右侧是距重置的时间。
+
+## 对自带 mod 的两处修补
+
+`mods/notes`：
+- 同时出现在 “Pinned” 和 “This agent” 的同一篇笔记，两行元素 id 相同，其中一行的点击被另一行吃掉
+  （表现为“pinned 的笔记偶尔打不开”）。行 id / pin id 加上 `pinned-` / `mine-` 作用域。
+- 打开失败时底部显示 `Could not open <name>`，不再一直停在省略号。
+
+`mods/agents-tree`：
+- 行尾的机器名（`mac-mini`）与分组标题重复，换成终端标题里的 **omp session title**，
+  去掉 `π`、spinner、图标等前缀，超过 22 字符用 `..` 截断。
 
 ## 安装
 
