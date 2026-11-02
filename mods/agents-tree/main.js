@@ -258,6 +258,7 @@ export default class Agents extends View {
     // Labels and the archive can be changed from a row menu (or another window),
     // so the newest copy wins on every render.
     this.labels = shared("agents-tree.labels") ?? {};
+    const labelNames = shared("agents-tree.labelNames") ?? {};
     this.archived = new Set(shared("agents-tree.archived") ?? []);
     if (props()?.sortMenu) return this.sortMenu(t);
     const collapsed = narrow();
@@ -426,7 +427,8 @@ export default class Agents extends View {
               cx.notify();
             })).child(pic)))
           .when(Boolean(this.labels[a.address]), (el) => el.child(div().size(7).flex_none().rounded(4)
-            .bg(labelHex(this.labels[a.address]) ?? t.dim)))
+            .bg(labelHex(this.labels[a.address]) ?? t.dim)
+            .tooltip(labelNames[this.labels[a.address]] || this.labels[a.address])))
           .child(div().flex_1().min_w(0).truncate().text_size(11.5)
             .text_color(idle || this.archived.has(a.address) ? t.muted : t.foreground).child(name))
           .child(div().w(17).h(17).flex_none().items_center().justify_center()
@@ -574,6 +576,11 @@ export default class Agents extends View {
                   .on_click((_e, cx) => { this.view = v.id; setShared("agents-tree.view", v.id); cx.notify(); })
                   .child(v.label);
               })))
+            .child(h_flex().id("ag-edit-tags").h(20).px(8).flex_none().items_center().rounded(6)
+              .text_size(11).text_color(t.dim).cursor_pointer().tooltip("编辑颜色标签")
+              .hover(el => el.bg(t.hover).text_color(t.foreground))
+              .on_click(() => openOverlay({ mod: "agent-menu", kind: "dialog", width: 400, height: 640, props: { editLabels: true } }))
+              .child("Tags"))
         ),
       )
       .when(list.length === 0 && !collapsed, (el) =>
