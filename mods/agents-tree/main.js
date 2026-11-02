@@ -347,7 +347,7 @@ export default class Agents extends View {
       // Two lines: the name alone on top, then the task indented under it with the
       // space, the age and the dot right-aligned after it.
       const indent = 9 + 15;
-      const tailW = (hasPill ? 76 : 0) + 6 * 3 + 30 + 18;   // pill, gaps, age, dot
+      const tailW = (hasPill ? 76 : 0) + 6 * 3 + 30 + 20;   // pill, gaps, age, dot
       const rowW = Math.max(160, (this.listW ?? sideW) - 16);  // the list pads 8 a side
       const taskW = Math.max(40, rowW - 20 - (8 + depth * 12) - indent - tailW);
       const pill = h_flex().flex_none().w(76).h(16).px(6).gap(4).items_center()
@@ -384,8 +384,10 @@ export default class Agents extends View {
           .child(div().flex_none().w(taskW).truncate().text_size(10).text_color(t.dim)
             .child(task ? shortTitle(task, Math.max(8, Math.floor(taskW / 5.8))) : ""))
           .when(hasPill, el => el.child(pill))
-          .when(Boolean(when), el => el.child(div().flex_none().w(30).text_size(10).text_color(t.dim).child(duration(now - when))))
-          .child(div().flex_none().child(this.status(t, a, byPriority && !isPinned))));
+          .when(Boolean(when), el => el.child(h_flex().flex_none().w(30).items_center()
+            .child(div().text_size(10).text_color(t.dim).child(duration(now - when)))))
+          .child(h_flex().flex_none().w(20).items_center().justify_center()
+            .child(this.status(t, a, byPriority && !isPinned))));
     };
 
     // Groups in list order: spaces (grouped) or priority sections. Agents of a
