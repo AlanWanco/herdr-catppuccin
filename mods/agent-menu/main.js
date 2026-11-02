@@ -92,7 +92,7 @@ export default class AgentMenu extends View {
       .on_click(onClick)
       .child(text);
     const swatch = ([name, hex]) => div().id("lm-" + name).size(16).flex_none().rounded(8).bg(hex).cursor_pointer()
-      .tooltip(names[name] ? names[name] + " · " + name : name)
+      .tooltip(names[name] || name)
       .when(mine === name, (el) => el.border(2).border_color(t.foreground))
       .hover((el) => el.border(2).border_color(t.muted))
       .on_click(finish(() => {
