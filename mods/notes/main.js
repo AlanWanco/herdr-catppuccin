@@ -235,8 +235,12 @@ export default class Notes extends View {
   render(cx) {
     const t = theme();
     const inPane = !props()?.overlay;
+    // Only an agent in front changes whose notes these are: clicking into this
+    // panel leaves no agent focused, and resetting then closed the note the
+    // click had just opened.
     const key = keyOf();
-    if (key !== this.agent) {
+    const focusedAgent = focused()?.agent;
+    if (focusedAgent && key !== this.agent) {
       this.release();
       this.note = null;
       this.agent = key;
@@ -296,7 +300,7 @@ export default class Notes extends View {
         .child(div().text_size(10).text_color(t.dim).child(String(count)));
       const pinnedRows = this.pinned.map((n) => ({ agent: n.agent, name: n.name, label: n.agent === this.agent ? n.name.replace(/\.md$/, "") : n.agent + " · " + n.name.replace(/\.md$/, "") }));
       const mine = this.notes.map((n) => ({ agent: this.agent, name: n.name, label: n.name.replace(/\.md$/, "") }));
-      return v_flex().id("notes").size_full().min_w(0).bg(t.surface).text_color(t.foreground).child(head)
+      return v_flex().id("notes-list").size_full().min_w(0).bg(t.surface).text_color(t.foreground).child(head)
         .child((pinnedRows.length || mine.length)
           ? v_flex().flex_1().min_h(0).overflow_y_scrollbar().p(4).gap(1)
             .when(pinnedRows.length > 0, (el) => el.child(title("Pinned · shown to every agent", pinnedRows.length))
@@ -326,7 +330,7 @@ export default class Notes extends View {
           return div().id("np-" + i).child(image(part.image).w(b.w).h(b.h));
         }));
 
-    return v_flex().id("notes").size_full().min_w(0).bg(t.surface).text_color(t.foreground).child(head)
+    return v_flex().id("notes-open").size_full().min_w(0).bg(t.surface).text_color(t.foreground).child(head)
       .child(v_flex().flex_1().min_h(0).min_w(0).child(body))
       .child(h_flex().flex_none().px(10).py(5).gap(8).border_t(1).border_color(t.border)
         .child(div().flex_1().min_w(0).truncate().text_size(10.5).text_color(t.dim)
