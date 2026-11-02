@@ -343,14 +343,13 @@ export default class Agents extends View {
       // Under a space header the space goes without saying; an automatic tab number says nothing.
       // Without a space header above (priority, pinned) the row names its space.
       const full = isPinned; // the space rides in its own pill when there is no space header
-      const name = full ? a.space_name || label(a) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
+      const name = more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
       // Two lines: the name alone on top, then the task indented under it with the
       // space, the age and the dot right-aligned after it.
       const indent = 9 + 15;
-      const tailW = (hasPill ? 76 : 0) + 22 + 10;   // pill, age, dot — packed together
       const rowW = Math.max(160, (this.listW ?? sideW) - 16);  // the list pads 8 a side
-      const taskW = Math.max(40, rowW - 20 - (8 + depth * 12) - indent - tailW);
-      const pill = h_flex().flex_none().w(76).h(16).pr(6).pl(4).gap(3).items_center().justify_end()
+      const taskW = Math.max(60, rowW - 20 - (8 + depth * 12) - indent - 190);
+      const pill = h_flex().flex_none().h(16).px(6).gap(3).items_center()
         .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
         .child(div().text_color(t.accent).child("\u2756"))
         .child(div().min_w(0).truncate().child(a.space_name ?? ""));
@@ -383,11 +382,11 @@ export default class Agents extends View {
         .child(h_flex().items_center().gap(0).pl(indent)
           .child(div().flex_none().w(taskW).truncate().text_size(10).text_color(t.dim)
             .child(task ? shortTitle(task, Math.max(8, Math.floor(taskW / 5.8))) : ""))
-          .when(hasPill, el => el.child(pill))
-          .when(Boolean(when), el => el.child(h_flex().flex_none().w(22).pl(2).items_center()
-            .child(div().text_size(10).text_color(t.dim).child(duration(now - when)))))
-          .child(h_flex().flex_none().w(10).items_center().justify_center()
-            .child(this.status(t, a, byPriority && !isPinned))));
+          .child(h_flex().flex_1().min_w(0).items_center().gap(6).justify_end()
+            .when(hasPill, el => el.child(pill))
+            .when(Boolean(when), el => el.child(div().flex_none().text_size(10).text_color(t.dim).child(duration(now - when))))
+            .child(h_flex().flex_none().w(14).items_center().justify_center()
+              .child(this.status(t, a, byPriority && !isPinned)))));
     };
 
     // Groups in list order: spaces (grouped) or priority sections. Agents of a
