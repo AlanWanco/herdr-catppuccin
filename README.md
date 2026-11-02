@@ -11,6 +11,7 @@ mods/spaces-tree/        自定义 mod（Spaces / Routing / Usage）
 mods/notes/               herdr 自带 notes mod 的本地修补
 mods/agents-tree/         herdr 自带 agents-tree mod 的本地修补
 mods/agent-menu/          agents-tree 的右键弹出菜单
+mods/quests/              Quest board 的单条记录清理
 omp/catppuccin-mocha.json omp TUI 主题（Catppuccin Mocha）
 ```
 
@@ -32,8 +33,8 @@ row
    └─ status       workspace-status   28px
 ```
 
-`spaces-tree` 和 `agent-menu` 是自定义 mod；`notes`、`agents-tree` 包含本仓库的修补。
-其余依赖由 herdr-app 自带，包括 `workspace-chrome`、`tabs-panel`、`files`、`changes`、`prompts`、`quests`、`workspace-status`。
+`spaces-tree` 和 `agent-menu` 是自定义 mod；`notes`、`agents-tree`、`quests` 包含本仓库的修补。
+其余依赖由 herdr-app 自带，包括 `workspace-chrome`、`tabs-panel`、`files`、`changes`、`prompts`、`workspace-status`。
 
 ## spaces-tree 做了什么
 
@@ -45,7 +46,7 @@ row
 - **Usage**：magpie 的配额与当日用量。多账号的 plan 默认收起（只有标题行），点开列出每个账号；
   单账号直接展示。进度条显示**剩余**额度，右侧是距重置的时间。
 
-## 对自带 mod 的两处修补
+## 对自带 mod 的修补
 
 `mods/notes`：
 - “Pinned” 和 “This agent” 的行 id / pin id 分别带 `pinned-` / `mine-` 作用域，避免同一篇笔记的元素 id 重复。
@@ -62,13 +63,19 @@ row
   两行制，第一行只有 agent 名字（不缩），第二行缩进显示标题（`..` 截断），
   右侧依次是 space 胶囊、时长、状态圆点；右侧留出滚动条位置，圆点不会被压住。
 
+`mods/quests`：
+- 每条 quest 的 `Feedback to agent` 右侧提供 `Cancel`，删除该条记录所在机器上的缓存文件并移出看板。
+  这是清理记录，不会中止 agent 或撤销已完成的工作。
+- 删除失败时保留卡片并显示错误；等待已开始的勾选保存完成，再删除文件，避免保存和自动刷新把记录重新带回。
+- 回归检查：`node --experimental-vm-modules --test tests/quests-cancel.test.mjs`（Node.js 20+）。
+
 ## 安装
 
 ```sh
 git clone https://github.com/AlanWanco/herdr-omp-catppuccin
 cd herdr-omp-catppuccin
 cp layouts/main-log.json layouts/terminals.json ~/.config/herdr-app/layouts/
-cp -r mods/spaces-tree mods/notes mods/agents-tree mods/agent-menu ~/.config/herdr-app/mods/
+cp -r mods/spaces-tree mods/notes mods/agents-tree mods/agent-menu mods/quests ~/.config/herdr-app/mods/
 ```
 
 文件会热加载；切换到 `main-log` 布局（或在现有布局里使用对应 mod）。
