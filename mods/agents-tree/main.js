@@ -302,6 +302,10 @@ export default class Agents extends View {
       // instead: the terminal title omp sets to the session title.
       const machine = a.address.includes("/") ? a.address.split("/")[0] : null;
       const task = cleanTitle(a.title);
+      // The row gives the agent's name its room first; the task gets what is left,
+      // never less than a few characters, and gives way on a narrow sidebar.
+      const sideW = find(layout(), "sidebar")?.size?.px ?? 268;
+      const titleW = Math.max(0, sideW - 300);
       if (collapsed) {
         return h_flex()
           .id(`ag-${a.address}`)
@@ -364,14 +368,14 @@ export default class Agents extends View {
             this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
             cx.notify();
           })).child(pic)))
-        .child(h_flex().flex_1().min_w(0).gap(5).items_center()
-          .child(div().min_w(0).max_w(full && more ? 110 : 180).truncate().text_color(idle ? t.muted : t.foreground).child(name))
-          .when((byPriority || isPinned) && Boolean(a.space_name), (el) => el.child(h_flex().flex_none().h(16).px(6).gap(4).items_center()
+        .child(h_flex().flex_none().gap(5).items_center()
+          .child(div().flex_none().max_w(150).truncate().text_color(idle ? t.muted : t.foreground).child(name))
+          .when(!task && (byPriority || isPinned) && Boolean(a.space_name), (el) => el.child(h_flex().flex_none().h(16).px(6).gap(4).items_center()
             .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
             .child(div().text_color(t.accent).child("\u2756"))
-            .child(div().max_w(90).truncate().child(a.space_name))))
+            .child(div().max_w(70).truncate().child(a.space_name))))
           .when(full && Boolean(more), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${more}`))))
-        .when(Boolean(task), el => el.child(div().flex_none().max_w(150).truncate().text_size(10).text_color(t.dim).child(shortTitle(task, 22))))
+        .when(Boolean(task) && titleW >= 54, el => el.child(div().flex_none().w(titleW).truncate().text_size(10).text_color(t.dim).child(shortTitle(task, Math.max(8, Math.floor(titleW / 5.4))))))
         .when(subs.length > 0, el => el.child(fold(a, subs)))
         .when(this.hovered === a.address, el => el.child(pin))
         .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))

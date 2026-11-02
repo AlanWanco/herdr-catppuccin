@@ -53,7 +53,7 @@ row
 
 `mods/agents-tree`：
 - 行尾的机器名（`mac-mini`）与分组标题重复，换成终端标题里的 **omp session title**，
-  去掉 `π`、spinner、图标等前缀，超过 22 字符用 `..` 截断。
+  去掉 `π`、spinner、图标等前缀；宽度不够时先让标题收缩（`..` 截断），agent 名字不缩。
 
 ## 安装
 
