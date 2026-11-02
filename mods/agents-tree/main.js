@@ -97,7 +97,7 @@ export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu) return;
     this.folded = new Set();
-    this.view = shared("agents-tree.view") ?? "status"; // "status" | "space"
+    this.view = shared("agents-tree.view") ?? "status"; // "status" | "space" | "tagged"
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
@@ -270,7 +270,9 @@ export default class Agents extends View {
     const now = Date.now();
     this.track(list, now);
     this.hold(list);
-    const byPriority = this.view !== "space";
+    const view = this.view ?? "status";
+    // Status sorts by urgency; Space and Tagged keep the app's own order.
+    const byPriority = view === "status";
     const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
     const rankOf = (a) => urgency.get(a.address);
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
@@ -285,8 +287,12 @@ export default class Agents extends View {
     }
     if (archiveDirty) this.saveArchived();
     const archivedRows = list.filter((a) => this.archived.has(a.address));
-    const rest = list.filter((a) => !this.pins.includes(a.address) && !this.archived.has(a.address));
-    list = [...pinned, ...rest];
+    // Pinned and Archive are the Status view's own grouping. Space and Tagged drop
+    // both sections but still list every agent, archived ones included.
+    const rest = byPriority
+      ? list.filter((a) => !this.archived.has(a.address) && !this.pins.includes(a.address))
+      : list;
+    list = byPriority ? [...pinned, ...rest] : rest;
     setAgentOrder(list.map((a) => a.address));
 
     const withKids = (a, i, depth = 0) => {
@@ -444,14 +450,24 @@ export default class Agents extends View {
               .child(this.status(t, a, byPriority && !isPinned)))));
     };
 
-    // Groups in list order: spaces (grouped) or priority sections. Agents of a
-    // space are next to each other in agents(), so neighbours make a group.
-    const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
-    for (const a of rest) {
-      const r = rankOf(a) || RANK.idle;
-      const id = byPriority ? `sec-${r}` : `sp-${a.space}`;
-      if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
-      else groups.push({ id, label: byPriority ? SECTION[r] : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a] });
+    // Groups in list order: pinned/urgency sections, spaces, or tags.
+    const groups = byPriority && pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
+    if (view === "tagged") {
+      // One group per color, in palette order, with whatever carries no tag last.
+      for (const [name] of LABELS) {
+        const members = rest.filter((a) => this.labels[a.address] === name);
+        if (members.length) groups.push({ id: "tag-" + name, label: labelNames[name] || name, dot: labelHex(name), status: null, members });
+      }
+      const plain = rest.filter((a) => !labelHex(this.labels[a.address]));
+      // The ones with no color still need a place: a group of their own, last.
+      if (plain.length) groups.push({ id: "tag-none", label: "无标签", status: null, members: plain });
+    } else {
+      for (const a of rest) {
+        const r = rankOf(a) || RANK.idle;
+        const id = byPriority ? `sec-${r}` : `sp-${a.space}`;
+        if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
+        else groups.push({ id, label: byPriority ? SECTION[r] : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a] });
+      }
     }
 
     // A group's header; it folds the group. Folded, it says how many and the most urgent state.
@@ -474,10 +490,9 @@ export default class Agents extends View {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         })
+        .when(Boolean(g.dot), (el) => el.child(div().size(8).flex_none().rounded(4).bg(g.dot)))
         .child(div().truncate().text_color(t[g.status] ?? t.dim).child(g.label))
-
-
-        .when(byPriority || !open, (el) => el.child(div().text_color(t.dim).child(String(g.members.length))))
+        .when(view !== "space" || !open, (el) => el.child(div().text_color(t.dim).child(String(g.members.length))))
         .child(div().flex_1())
         .when(!open, (el) => el
           .when(!byPriority && top && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
@@ -504,21 +519,19 @@ export default class Agents extends View {
       .child(div().flex_1())
       .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none().text_color(t.dim));
 
-    // The archive folder is always there, empty or not; it is where a row goes to rest.
+    // The archive folder belongs to Status, where a row goes to rest.
     const archiveSection = () => {
+      if (!byPriority) return [];
       const g = { id: "archive", label: "Archive", status: null, members: archivedRows };
       return [header(g), ...(this.folded.has("archive") ? [] : archivedRows.flatMap((a, i) => withKids(a, i, 0)))];
     };
 
     let rows;
     if (collapsed) rows = list.flatMap((a, i) => withKids(a, i, 0));
+    else if (view === "tagged") rows = groups.flatMap((g) => [header(g), ...(this.folded.has(g.id) ? [] : g.members.flatMap((a, i) => withKids(a, i, 0)))]);
     else if (byPriority) rows = [...groups.flatMap((g) => [header(g), ...(this.folded.has(g.id) ? [] : g.members.flatMap((a, i) => withKids(a, i, 0)))]), ...archiveSection()];
     else {
       rows = [];
-      if (pinned.length) {
-        rows.push(header(groups[0]));
-        if (!this.folded.has("pinned")) rows.push(...pinned.flatMap((a, i) => withKids(a, i, 0)));
-      }
       const machines = [];
       for (const a of rest) {
         const m = a.address.includes("/") ? a.address.split("/")[0] : "";
@@ -547,7 +560,6 @@ export default class Agents extends View {
           if (sOpen) rows.push(...g.members.flatMap((a, i) => withKids(a, i, 2)));
         });
       }
-      rows.push(...archiveSection());
     }
 
     return v_flex()
@@ -568,7 +580,7 @@ export default class Agents extends View {
             .items_center()
             .justify_between()
             .child(h_flex().gap(2)
-              .children([{ id: "status", label: "Status" }, { id: "space", label: "Space" }].map((v) => {
+              .children([{ id: "status", label: "Status" }, { id: "space", label: "Space" }, { id: "tagged", label: "Tagged" }].map((v) => {
                 const on = (this.view ?? "status") === v.id;
                 return h_flex().id("ag-view-" + v.id).h(20).px(8).flex_none().items_center().rounded(6)
                   .text_size(11).cursor_pointer()
