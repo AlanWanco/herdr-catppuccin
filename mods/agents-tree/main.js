@@ -288,21 +288,21 @@ export default class Agents extends View {
       const mine = this.labels[a.address] ?? null;
       const archived = this.archived.has(a.address);
       const act = (fn) => (_e, cx) => { fn(); this.menuFor = null; cx.notify(); };
-      const item = (id, text) => h_flex().id(id).h(28).px(8).items_center().rounded(6).text_size(12)
+      const item = (id, text) => h_flex().id(id).h(26).px(7).items_center().rounded(6).text_size(12)
         .text_color(t.foreground).hover((el) => el.bg(t.hover)).child(text);
-      const dot = ([name, hex]) => div().id("lm-" + name).size(16).flex_none().rounded(8).bg(hex).cursor_pointer()
+      const dot = ([name, hex]) => div().id("lm-" + name).size(14).flex_none().rounded(7).bg(hex).cursor_pointer()
         .when(mine === name, (el) => el.border(2).border_color(t.foreground))
         .hover((el) => el.border(2).border_color(t.muted))
         .on_click(act(() => this.setLabel(a.address, name)));
-      return v_flex().id("menu-" + a.address).pl(8).pr(8).pb(6).pt(2)
-        .child(v_flex().p(4).rounded(8).bg(t.popover).border_1().border_color(t.border).gap(1)
+      return v_flex().id("menu-" + a.address).pl(8).pb(6)
+        .child(v_flex().w(196).p(4).rounded(8).bg(t.popover).border_1().border_color(t.border).gap(1)
           .child(item("am-rename", "重命名…").on_click(act(() => run("tab.rename", { id: a.tab }))))
           .child(item("am-archive", archived ? "取消归档" : "归档").on_click(act(() => {
             archived ? this.archived.delete(a.address) : this.archived.add(a.address);
             this.saveArchived();
           })))
-          .child(div().px(8).pt(4).text_size(10.5).text_color(t.dim).child("标签"))
-          .children([LABELS.slice(0, 7), LABELS.slice(7)].map((line) => h_flex().gap(6).px(8).py(2)
+          .child(div().px(7).pt(5).pb(1).text_size(10).text_color(t.dim).child("标签"))
+          .children([LABELS.slice(0, 7), LABELS.slice(7)].map((line) => h_flex().gap(5).px(7).py(1)
             .children(line.map(dot))))
           .when(Boolean(mine), (el) => el.child(item("am-clear", "清除标签").on_click(act(() => this.setLabel(a.address, null))))));
     };
