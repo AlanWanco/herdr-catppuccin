@@ -348,7 +348,9 @@ export default class Agents extends View {
       // space, the age and the dot right-aligned after it.
       const indent = 9 + 15;
       const rowW = Math.max(160, (this.listW ?? sideW) - 16);  // the list pads 8 a side
-      const taskW = Math.max(60, rowW - 20 - (8 + depth * 12) - indent - 190);
+      // The tail is natural-width now, so the title keeps the room instead of
+      // yielding a fixed column to a pill that is often shorter than that.
+      const taskW = Math.max(80, rowW - 20 - (8 + depth * 12) - indent - 150);
       const pill = h_flex().flex_none().h(16).px(6).gap(3).items_center()
         .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
         .child(div().text_color(t.accent).child("\u2756"))
