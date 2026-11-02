@@ -347,8 +347,9 @@ export default class Agents extends View {
       // Two lines: the name alone on top, then the task indented under it with the
       // space, the age and the dot right-aligned after it.
       const indent = 9 + 15;
-      const tailW = (hasPill ? 76 : 0) + 30 + 20 + 18;
-      const taskW = Math.max(40, sideW - 44 - depth * 12 - indent - tailW);
+      const tailW = (hasPill ? 76 : 0) + 6 * 3 + 30 + 18;   // pill, gaps, age, dot
+      const rowW = Math.max(160, (this.listW ?? sideW) - 16);  // the list pads 8 a side
+      const taskW = Math.max(40, rowW - 20 - (8 + depth * 12) - indent - tailW);
       const pill = h_flex().flex_none().w(76).h(16).px(6).gap(4).items_center()
         .rounded(8).border_1().border_color(t.border).bg(t.panel ?? t.chrome).text_size(10).text_color(t.muted)
         .child(div().text_color(t.accent).child("\u2756"))
@@ -516,7 +517,13 @@ export default class Agents extends View {
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
-      .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always").children(rows))
+      .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always")
+        .on_size_change((size, cx) => {
+          // The rows size their trailing group from this, so the dot stays put.
+          const w = Math.round(size.width);
+          if (Math.abs((this.listW ?? 0) - w) > 2) { this.listW = w; cx.notify(); }
+        })
+        .children(rows))
       .when(collapsed, (el) =>
         el.child(
           h_flex()
