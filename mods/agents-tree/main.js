@@ -298,7 +298,9 @@ export default class Agents extends View {
     let archiveDirty = false;
     for (const addr of [...this.archived]) {
       const a = list.find((x) => x.address === addr);
-      if (!a || a.status === "working" || a.status === "blocked") { this.archived.delete(addr); archiveDirty = true; }
+      // Absent is not news: the list is empty before agents load and a machine can be
+      // briefly away. Dropping the id there is what lost the archive across restarts.
+      if (a && (a.status === "working" || a.status === "blocked")) { this.archived.delete(addr); archiveDirty = true; }
     }
     if (archiveDirty) this.saveArchived();
     const archivedRows = list.filter((a) => this.archived.has(a.address));
