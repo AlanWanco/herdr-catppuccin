@@ -721,6 +721,7 @@ export default class Spaces extends View {
     const collapsed = narrow();
     // The rail has no tabs: it always lists spaces, whatever tab the panel was on.
     const tab = collapsed ? "spaces" : (this.tab ?? "spaces");
+    const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
     const sp = spaces();
     const ids = new Set(sp.map(p => p.id));
     const kept = Object.fromEntries(Object.entries(shared("space.colors") ?? {}).filter(([id]) => ids.has(id)));
