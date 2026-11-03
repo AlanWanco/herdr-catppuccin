@@ -11,7 +11,7 @@ mods/spaces-tree/        自定义 mod（Spaces / Routing / Usage）
 mods/notes/               herdr 自带 notes mod 的本地修补
 mods/agents-tree/         herdr 自带 agents-tree mod 的本地修补
 mods/agent-menu/          agents-tree 的右键弹出菜单
-themes/catppuccin-mocha.json herdr 的终端主题（selection 调亮以看清选中）
+themes/catppuccin-mocha.json herdr 的终端主题（Catppuccin Mocha）
 mods/quests/              Quest board 的单条记录清理
 omp/catppuccin-mocha.json omp TUI 主题（Catppuccin Mocha）
 ```
@@ -106,6 +106,7 @@ cp -r mods/spaces-tree mods/notes mods/agents-tree mods/agent-menu mods/quests ~
 
 布局与 mod 会热加载，切到 `main-log` 布局（或在现有布局里使用对应 mod）即可。
 **主题文件只在 herdr-app 启动时读取**，换了 `themes/catppuccin-mocha.json` 要重启一次窗口才生效。
+
 
 ## omp 主题
 
