@@ -1,7 +1,7 @@
 // Notes: markdown files in ~/.config/herdr-app/notes, written with a live preview, pictures pasted
 // straight into the text. Nothing but those files is stored, so they are yours to edit anywhere.
-import { View, div, image, svg } from "gpui-kit";
-import { v_flex, h_flex, Editor, EditorState, Input, InputState, TextView } from "gpui-base";
+import { View, div, svg } from "gpui-kit";
+import { v_flex, h_flex, Editor, EditorState, Input, InputState } from "gpui-base";
 import { agents, focused, appHome, exec, settings, theme, window, props, openOverlay, closeOverlay } from "herdr";
 import * as fs from "fs/promises";
 
@@ -19,20 +19,6 @@ const stamp = () => {
 };
 
 const ps = (p) => "'" + String(p).replace(/'/g, "''") + "'";
-
-// "![alt](path)" pieces, so pictures can be drawn with image() while the rest stays markdown.
-function split(text) {
-  const out = [];
-  const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  let at = 0, m;
-  while ((m = re.exec(String(text)))) {
-    if (m.index > at) out.push({ text: text.slice(at, m.index) });
-    out.push({ image: m[2].replace(/^<|>$/g, "").trim(), alt: m[1] });
-    at = m.index + m[0].length;
-  }
-  if (at < String(text).length) out.push({ text: text.slice(at) });
-  return out;
-}
 
 export default class Notes extends View {
   init(_props, cx) {
@@ -127,14 +113,20 @@ export default class Notes extends View {
         font_family: settings().font_family, font_size: 13 });
       this.state.on("change", (_e, cx) => { this.text = this.state.value(); this.save(cx); cx.notify(); });
       this.state.on("paste_other", (_e, cx) => cx.spawn((cx) => this.pasteImage(cx)));
-      this.measure(this.text, cx);
-    } catch { this.text = ""; this.state = null; this.failed = "Could not open " + name; }
+      // Read mode is the same text in a read-only editor: TextView paints an opaque
+      // block over what is selected, so the selected words were unreadable there.
+      this.viewState = EditorState.new({ value: this.text, readonly: true, soft_wrap: true, line_numbers: false, folding: false,
+        font_family: settings().font_family, font_size: 13 });
+    } catch { this.text = ""; this.state = null; this.viewState = null; this.failed = "Could not open " + name; }
     cx.notify();
   }
 
   release() {
-    if (this.state) { try { this.state.release(); } catch { /* already gone */ } }
+    for (const state of [this.state, this.viewState]) {
+      if (state) { try { state.release(); } catch { /* already gone */ } }
+    }
     this.state = null;
+    this.viewState = null;
   }
 
   async save(cx) {
@@ -181,27 +173,6 @@ export default class Notes extends View {
     cx.timer.after(2500, (cx) => { this.pasted = null; cx.notify(); });
   }
 
-  // A picture's size, so the preview can fit it to the column without stretching it.
-  async measure(text, cx) {
-    this.sizes = this.sizes ?? {};
-    for (const part of split(text)) {
-      const rel = part.image;
-      if (!rel || this.sizes[rel]) continue;
-      const abs = appHome() + "\\" + rel.replace(/\//g, "\\");
-      const r = await exec("ffprobe", ["-v", "error", "-select_streams", "v", "-show_entries", "stream=width,height", "-of", "csv=p=0", abs]).catch(() => null);
-      const [w, h] = String(r?.stdout ?? "").trim().split(",").map(Number);
-      if (w > 0 && h > 0) this.sizes[rel] = { w, h };
-    }
-    cx.notify();
-  }
-
-  box(rel) {
-    const s = this.sizes?.[rel], W = this.wide ?? 320;
-    if (!s) return { w: W, h: 200 };
-    const k = Math.min(W / s.w, 1);
-    return { w: Math.round(s.w * k), h: Math.round(s.h * k) };
-  }
-
   startRename(cx) {
     const value = this.note.replace(/\.md$/, "");
     this.nameInput = InputState.new({ value });
@@ -218,7 +189,7 @@ export default class Notes extends View {
     const next = (this.text ?? "").replace(/\s+$/, "") + add;
     this.text = next;
     if (this.state) this.state.set_value(next);
-    if (cx) cx.spawn((cx) => this.measure(next, cx));
+    if (this.viewState) this.viewState.set_value(next);
   }
 
   // A picture dropped from the desktop lands in notes/images and is appended the same way.
@@ -274,7 +245,7 @@ export default class Notes extends View {
           .on_click((_e, cx) => { this.view = "write"; cx.notify(); }).child("write"))
         .child(h_flex().id("notes-read").h(22).px(8).items_center().rounded(5).text_size(11).cursor_pointer()
           .bg(this.view === "read" ? t.selected : t.raised).text_color(this.view === "read" ? t.foreground : t.dim)
-          .on_click((_e, cx) => { this.view = "read"; cx.notify(); }).child("read"))))
+          .on_click((_e, cx) => { this.view = "read"; this.viewState?.set_value(this.text); cx.notify(); }).child("read"))))
       .when(Boolean(this.note), (el) => el.child(h_flex().id("notes-pin").h(22).w(24).flex_none().items_center().justify_center().rounded(6)
         .text_color(this.pins[this.pinKey(this.noteAgent, this.note)] ? t.accent : t.dim)
         .bg(this.pins[this.pinKey(this.noteAgent, this.note)] ? t.selected : t.chrome)
@@ -315,24 +286,13 @@ export default class Notes extends View {
           .child(div().max_w(220).truncate().text_size(10.5).text_color(t.dim).child("Files in " + dirFor(this.agent)))));
     }
 
-    const wide = this.wide;
-    const body = this.view === "write"
-      ? (this.state
-        ? v_flex().flex_1().min_h(0).min_w(0).p(8).on_size_change((size, cx) => {
-          const h = Math.max(160, Math.round(size.height - 16));
-          if (Math.abs((this.bodyH ?? 0) - h) > 4) { this.bodyH = h; cx.notify(); }
-        }).child(Editor.new(this.state).w_full().h(this.bodyH ?? 420))
-        : div().p(12).child("…"))
-      : v_flex().flex_1().min_h(0).min_w(0).overflow_y_scrollbar().p(12).gap(8)
-        .on_size_change((size, cx) => {
-          const w = Math.max(120, Math.round(size.width - 24));
-          if (Math.abs((this.wide ?? 0) - w) > 4) { this.wide = w; cx.notify(); }
-        })
-        .children(split(this.text).map((part, i) => {
-          if (!part.image) return TextView.markdown("np-" + i, part.text);
-          const b = this.box(part.image);
-          return div().id("np-" + i).child(image(part.image).w(b.w).h(b.h));
-        }));
+    const shown = this.view === "write" ? this.state : this.viewState;
+    const body = shown
+      ? v_flex().flex_1().min_h(0).min_w(0).p(8).on_size_change((size, cx) => {
+        const h = Math.max(160, Math.round(size.height - 16));
+        if (Math.abs((this.bodyH ?? 0) - h) > 4) { this.bodyH = h; cx.notify(); }
+      }).child(Editor.new(shown).w_full().h(this.bodyH ?? 420))
+      : div().p(12).child("…");
 
     return v_flex().id("notes-open").size_full().min_w(0).bg(t.surface).text_color(t.foreground).child(head)
       .child(v_flex().flex_1().min_h(0).min_w(0).child(body))
