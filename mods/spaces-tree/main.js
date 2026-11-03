@@ -96,9 +96,9 @@ export default class Spaces extends View {
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (see `due`).
-    cx.timer.every(250, (cx) => this.checkNew(cx));
+    cx.timer.every(500, (cx) => this.checkNew(cx));
     // The gateway's own routing decisions live in magpie web, not the 3425 API.
-    cx.timer.every(4000, (cx) => this.loadTrace(cx));
+    cx.timer.every(6000, (cx) => this.loadTrace(cx));
   }
 
   checkNew(cx) {

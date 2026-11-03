@@ -7,7 +7,7 @@ import * as fs from "fs/promises";
 
 const DIR = () => appHome() + "\\cache\\quests";
 const SHOW = 12;      // quests drawn at once
-const TICK = 4000;    // a cheap re-read: the extension writes these files
+const TICK = 10000;   // a cheap re-read: the extension writes these files
 
 const stamp = (iso) => {
   const d = new Date(iso);
@@ -95,35 +95,45 @@ export default class Quests extends View {
     const machines = [null, ...new Set(spaces().map((s) => s.machine).filter(Boolean))];
     const out = [];
     for (const machine of machines) {
-      let names = [];
-      let read = null;
       if (!machine) {
+        let names = [];
         try { names = (await fs.readdir(DIR())).filter((n) => n.endsWith(".json")); } catch { names = []; }
-        read = async (name) => fs.readFile(DIR() + "\\" + name, "utf8");
-      } else {
-        const home = this.homes = this.homes ?? {};
-        if (!home[machine]) {
-          const r = await exec("sh", ["-c", 'printf %s "$HOME"'], { on: machine }).catch(() => null);
-          home[machine] = String(r?.stdout ?? "").trim();
+        for (const name of names.slice(-40)) {
+          try {
+            const q = JSON.parse(await fs.readFile(DIR() + "\\" + name, "utf8"));
+            if (q && typeof q === "object") out.push({ ...q, file: name, machine });
+          } catch { /* a half-written file waits for the next pass */ }
         }
-        const path = home[machine] + "/.config/herdr-app/cache/quests";
-        const r = await exec("sh", ["-c", 'ls -1 "$1" 2>/dev/null', "sh", path], { on: machine }).catch(() => null);
-        names = String(r?.stdout ?? "").split(/\r?\n/).filter((n) => n.endsWith(".json"));
-        read = async (name) => {
-          const r = await exec("sh", ["-c", 'base64 < "$1"', "sh", path + "/" + name], { on: machine }).catch(() => null);
-          return r && r.code === 0 ? b64decode(r.stdout) : null;
-        };
+        continue;
       }
-      for (const name of names.slice(-40)) {
+      const home = this.homes = this.homes ?? {};
+      if (!home[machine]) {
+        const r = await exec("sh", ["-c", 'printf %s "$HOME"'], { on: machine }).catch(() => null);
+        home[machine] = String(r?.stdout ?? "").trim();
+      }
+      // The whole board in one round trip: a process per file was the expensive part.
+      const path = home[machine] + "/.config/herdr-app/cache/quests";
+      const script = 'cd "$1" 2>/dev/null || exit 0; for f in $(ls -1 *.json 2>/dev/null | tail -n 40); do'
+        + ' printf "\\n<quest %s>\\n" "$f"; base64 < "$f"; done';
+      const r = await exec("sh", ["-c", script, "sh", path], { on: machine }).catch(() => null);
+      for (const chunk of String(r?.stdout ?? "").split("<quest ").slice(1)) {
+        const end = chunk.indexOf(">");
+        if (end < 0) continue;
+        const name = chunk.slice(0, end).trim();
+        const body = chunk.slice(end + 1).replace(/[^A-Za-z0-9+/=]/g, "");
+        if (!name.endsWith(".json") || !body) continue;
         try {
-          const text = await read(name);
-          const q = JSON.parse(text);
+          const q = JSON.parse(b64decode(body));
           if (q && typeof q === "object") out.push({ ...q, file: name, machine });
         } catch { /* a half-written file waits for the next pass */ }
       }
     }
     if (revision !== this.revision) return;
     out.sort((a, b) => String(b.at ?? "").localeCompare(String(a.at ?? "")));
+    // Nothing new: a repaint would redraw every mod's window for no reason.
+    const scan = JSON.stringify(out);
+    if (scan === this.scan) return;
+    this.scan = scan;
     this.quests = out;
     cx.notify();
   }

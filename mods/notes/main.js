@@ -48,7 +48,7 @@ export default class Notes extends View {
     this.noteAgent = this.agent;
     this.list(cx);
     // The folder is also edited outside; a cheap re-read keeps the list honest.
-    cx.timer.every(4000, (cx) => { if (!this.note) this.list(cx); });
+    cx.timer.every(10000, (cx) => { if (!this.note) this.list(cx); });
   }
 
   async list(cx) {
@@ -66,7 +66,11 @@ export default class Notes extends View {
       if (!agent || !name) continue;
       if (await fs.exists(dirFor(agent) + "\\" + name).catch(() => false)) pinned.push({ agent, name });
     }
+    // Only a different list deserves a repaint: a poll redraws every mod's window.
+    const scan = JSON.stringify([this.notes, pinned]);
     this.pinned = pinned;
+    if (scan === this.scan) return;
+    this.scan = scan;
     cx.notify();
   }
 

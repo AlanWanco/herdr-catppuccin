@@ -104,7 +104,8 @@ export default class Agents extends View {
     this.labels = shared("agents-tree.labels") ?? {};
     this.archived = new Set(shared("agents-tree.archived") ?? []);
 
-    cx.timer.every(30000, (cx) => cx.notify());
+    // The ages are read in minutes: a repaint a minute is plenty, and each one redraws the window.
+    cx.timer.every(60000, (cx) => cx.notify());
   }
 
   // Stamps agents whose state changed. Done and idle count as one: looking at a
@@ -206,7 +207,16 @@ export default class Agents extends View {
 
   // Live sub-agents of `addr`, depth first, each with the tree lines in front of it.
   tree(all, addr, lead = []) {
-    const kids = all.filter((k) => k.parent === addr && k.state === "live");
+    // One index per render: scanning every terminal per agent made this quadratic.
+    this.kids ??= (() => {
+      const map = new Map();
+      for (const k of all) if (k.state === "live" && k.parent) {
+        if (!map.has(k.parent)) map.set(k.parent, []);
+        map.get(k.parent).push(k);
+      }
+      return map;
+    })();
+    const kids = this.kids.get(addr) ?? [];
     return kids.flatMap((k, i) => {
       const last = i === kids.length - 1;
       return [
@@ -266,6 +276,7 @@ export default class Agents extends View {
     let list = agents();
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
+    this.kids = null;
     const shown = focused()?.agent;
     const now = Date.now();
     this.track(list, now);
@@ -273,7 +284,11 @@ export default class Agents extends View {
     const view = this.view ?? "status";
     // Status sorts by urgency; Space and Tagged keep the app's own order.
     const byPriority = view === "status";
-    const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
+    const urgency = new Map(list.map((a) => {
+      let top = 0;
+      for (const s of this.tree(all, a.address)) top = Math.max(top, RANK[kidStatus(s.t, this.listed)] ?? 0);
+      return [a.address, Math.max(this.rank(a), top)];
+    }));
     const rankOf = (a) => urgency.get(a.address);
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
     this.prunePins(all);
@@ -332,9 +347,15 @@ export default class Agents extends View {
     // agent's own title, never an automatic tab number unless two rows would
     // otherwise read the same.
     const tabs = spaces().flatMap(s => s.tabs);
+    const tabById = new Map(tabs.map(t => [t.id, t]));
+    const ps = panes();
+    const labels = new Map();
     const label = (a) => {
-      const tab = tabs.find(tab => tab.id === a.tab);
-      return tab ? title(tab, lead(tab)) : a.title || a.program?.name || "";
+      if (!labels.has(a.address)) {
+        const tab = tabById.get(a.tab);
+        labels.set(a.address, tab ? title(tab, lead(tab, ps)) : a.title || a.program?.name || "");
+      }
+      return labels.get(a.address);
     };
     const detail = new Map(list.map(a => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
     const seen = {};

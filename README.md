@@ -81,6 +81,19 @@ row
 - 删除失败时保留卡片并显示错误；等待已开始的勾选保存完成，再删除文件，避免保存和自动刷新把记录重新带回。
 - 回归检查：`node --experimental-vm-modules --test tests/quests-cancel.test.mjs`（Node.js 20+）。
 
+## 轮询与重绘
+
+每个 mod 的一次 `cx.notify()` 都会重绘整个窗口，所以轮询只在数据真变了时才重绘：
+
+- `quests`：10s 一次；远端机器整块看板用**一条** `sh` 命令读完（原本每个文件一条），
+  扫描结果与上次相同则不重绘。
+- `notes`：10s 一次；列表与置顶都没变则不重绘。
+- `spaces-tree`：git/新空间的检查 500ms 一次，magpie trace 6s 一次（仅 Routing tab）。
+- `agents-tree`：分钟级的时长文字 60s 刷新一次；每次渲染只建一次终端/标签索引，
+  不再按 agent 反复全量扫描 `terminals()`，`panes()` 也只取一次。
+
+多个 agent 正在跑时，列表里的旋转 spinner 是原生动画，会持续重绘窗口，那部分是主要开销。
+
 ## 安装
 
 ```sh
