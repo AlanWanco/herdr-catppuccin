@@ -715,7 +715,8 @@ export default class Spaces extends View {
   render() {
     const t = theme();
     const collapsed = narrow();
-    const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
+    // The rail has no tabs: it always lists spaces, whatever tab the panel was on.
+    const tab = collapsed ? "spaces" : (this.tab ?? "spaces");
     const sp = spaces();
     const ids = new Set(sp.map(p => p.id));
     const kept = Object.fromEntries(Object.entries(shared("space.colors") ?? {}).filter(([id]) => ids.has(id)));
@@ -728,7 +729,8 @@ export default class Spaces extends View {
     }
     if (changed) setShared("space.colors", kept);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
-      .child(h_flex().h(34).pl(16).pr(10).items_center().justify_between().text_size(12).text_color(t.dim)
+      .child(h_flex().h(34).pl(collapsed ? 0 : 16).pr(collapsed ? 0 : 10).items_center().justify_between().text_size(12).text_color(t.dim)
+        .when(collapsed, (el) => el.justify_center())
         .when(!collapsed, el => el.child(h_flex().gap(2)
           .children([{ id: "spaces", label: "Spaces" }, { id: "routing", label: "Routing" }, { id: "usage", label: "Usage" }].map((v) => {
             const on = (this.tab ?? "spaces") === v.id;
@@ -738,12 +740,12 @@ export default class Spaces extends View {
               .on_click((_e, cx) => { this.tab = v.id; setShared("spaces-tree.tab", v.id); if (v.id === "usage") this.loadStats(cx); if (v.id === "routing") this.loadTrace(cx); cx.notify(); })
               .child(v.label);
           }))))
-        .when((this.tab ?? "spaces") === "spaces", (el) => el.child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6)
+        .when(tab === "spaces", (el) => el.child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6)
           .hover(s => s.bg(t.hover).text_color(t.foreground))
           .on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14)))))
-      .child((this.tab ?? "spaces") === "usage"
+      .child(tab === "usage"
         ? this.usageView(t, collapsed)
-        : (this.tab ?? "spaces") === "routing"
+        : tab === "routing"
         ? this.routingView(t, collapsed)
         : v_flex().flex_1().min_h(0).px(8).pb(14).overflow_y_scrollbar().mode("always")
           .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
